@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -7,12 +9,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from snow_day.cache import LastModifiedCache
+from snow_day.config import app_config
+from snow_day.logging import get_logger, setup_logging
 from snow_day.models import ConditionSnapshot
 from snow_day.resorts import ResortMeta, all_resorts, resort_lookup
+from snow_day.scheduler import build_scheduler
 from snow_day.scrapers import SCRAPERS, fetch_conditions
 from snow_day.services.llm_client import LLMClient, ScoredResort
-from snow_day.services.scoring import ScoreResult, score_snapshot
+from snow_day.services.scoring import ScoreResult, ScoringConfig, score_snapshot
 from snow_day.storage import ConditionStore
+
+setup_logging(app_config.logging)
+logger = get_logger(__name__)
 
 app = FastAPI(title="Snow Day API")
 
@@ -66,8 +74,9 @@ class ConditionsResponse(BaseModel):
 store = ConditionStore()
 cache = LastModifiedCache()
 llm_client = LLMClient()
+scoring_config = ScoringConfig.from_sources(config_data=app_config.scoring)
 
-_resorts: List[ResortMeta] = all_resorts({rid: url for rid, (url, _) in SCRAPERS.items()})
+_resorts: List[ResortMeta] = all_resorts()
 _resort_index: Dict[str, ResortMeta] = resort_lookup(_resorts)
 
 
@@ -107,7 +116,7 @@ def _score_resorts() -> RankingsResponse:
 
     for snapshot in snapshots:
         previous = store.list_snapshots(snapshot.resort_id, limit=5)[1:]
-        result: ScoreResult = score_snapshot(snapshot, previous_snapshots=previous)
+        result: ScoreResult = score_snapshot(snapshot, previous_snapshots=previous, config=scoring_config)
         payload = _snapshot_to_payload(snapshot)
         resort = _resort_index.get(snapshot.resort_id)
         ranked.append(
@@ -131,6 +140,25 @@ def _score_resorts() -> RankingsResponse:
     return RankingsResponse(updated_at=updated_at, rankings=ranked, summary=summary)
 
 
+def refresh_and_score() -> RankingsResponse:
+    logger.info("refresh.start")
+    for resort_id in SCRAPERS.keys():
+        trace_id = uuid.uuid4().hex
+        try:
+            snapshot = fetch_conditions(resort_id, cache=cache, trace_id=trace_id)
+            store.add_snapshot(snapshot)
+        except Exception as exc:  # pragma: no cover - surface partial refresh when scrapes fail
+            logger.error(
+                "refresh.error",
+                trace_id=trace_id,
+                resort_id=resort_id,
+                error=str(exc),
+            )
+            continue
+    logger.info("refresh.complete")
+    return _score_resorts()
+
+
 @app.get("/conditions", response_model=ConditionsResponse)
 def get_conditions() -> ConditionsResponse:
     snapshots = _latest_snapshots()
@@ -146,11 +174,21 @@ def get_rankings() -> RankingsResponse:
 
 @app.post("/refresh", response_model=RankingsResponse)
 def refresh_conditions() -> RankingsResponse:
-    for resort_id in SCRAPERS.keys():
-        try:
-            snapshot = fetch_conditions(resort_id, cache=cache)
-            store.add_snapshot(snapshot)
-        except Exception:  # pragma: no cover - surface partial refresh when scrapes fail
-            continue
-    return _score_resorts()
+    return refresh_and_score()
 
+
+_scheduler = build_scheduler(refresh_and_score, app_config.scheduler)
+
+
+@app.on_event("startup")
+async def _start_scheduler() -> None:
+    if _scheduler and not _scheduler.running:
+        logger.info("scheduler.start")
+        _scheduler.start()
+
+
+@app.on_event("shutdown")
+async def _stop_scheduler() -> None:
+    if _scheduler and _scheduler.running:
+        logger.info("scheduler.stop")
+        _scheduler.shutdown()
