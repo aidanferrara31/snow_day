@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import textwrap
 from dataclasses import dataclass
 from typing import List, Optional, Sequence
@@ -63,14 +64,15 @@ class LLMClient:
 
     def __init__(
         self,
-        base_url: str = "http://localhost:11434",
+        base_url: Optional[str] = None,
         *,
         model: str = "phi3",
         timeout: float = 8.0,
         client: Optional[httpx.Client] = None,
         fallback: Optional[RuleBasedAdvisor] = None,
     ) -> None:
-        self.base_url = base_url.rstrip("/")
+        resolved_base_url = base_url or os.getenv("SNOWDAY_LLM_URL", "http://localhost:11434")
+        self.base_url = resolved_base_url.rstrip("/")
         self.model = model
         self.client = client or httpx.Client(timeout=timeout)
         self.fallback = fallback or RuleBasedAdvisor()
