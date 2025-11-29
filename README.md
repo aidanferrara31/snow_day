@@ -3,6 +3,23 @@
 Snow Day scrapes ski resort condition data, normalizes key metrics, and scores
 resorts so trip planners can quickly decide where to ride next.
 
+## API and frontend
+
+Start the FastAPI server with:
+
+```bash
+uvicorn snow_day.api:app --reload
+```
+
+Endpoints:
+
+- `GET /conditions` returns the latest normalized snapshots for each resort.
+- `GET /rankings` provides ranked resorts with scoring rationales and an LLM summary.
+- `POST /refresh` re-scrapes all resorts and returns fresh rankings.
+
+The `frontend` folder contains a Vite + React + Tailwind UI that calls these endpoints
+for a live dashboard. Set `VITE_API_URL` to the API base URL when running `npm run dev`.
+
 ## Local LLM model server
 
 Use the provided Dockerfile to run an Ollama-compatible model server locally.
