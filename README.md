@@ -3,6 +3,38 @@
 Snow Day scrapes ski resort condition data, normalizes key metrics, and scores
 resorts so trip planners can quickly decide where to ride next.
 
+## Containerized setup
+
+Build and run the full stack with Docker Compose:
+
+```bash
+make bootstrap  # builds images and installs frontend dependencies
+make dev        # starts backend (FastAPI), frontend (Vite), and the local model
+```
+
+Or start everything directly with Compose:
+
+```bash
+docker-compose up --build
+```
+
+Service ports:
+
+- API/backend: http://localhost:8000
+- Frontend: http://localhost:5173
+- Local model (Ollama-compatible): http://localhost:11434
+
+Data persistence and caching:
+
+- `snow_day_data` volume stores the SQLite database at `/app/data/conditions.db`.
+- `ollama_models` volume caches pulled models at `/root/.ollama`.
+
+Trigger a manual scrape/score refresh against a running stack:
+
+```bash
+make refresh
+```
+
 ## API and frontend
 
 Start the FastAPI server with:
