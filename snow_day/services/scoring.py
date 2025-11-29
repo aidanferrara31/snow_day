@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, Mapping, Optional, Tuple
 
+from snow_day.config import app_config
 from snow_day.models import ConditionSnapshot
 
 
@@ -13,8 +14,8 @@ from snow_day.models import ConditionSnapshot
 class ScoringConfig:
     """Configuration for the scoring algorithm.
 
-    Values can be overridden via a JSON config file or environment variables
-    prefixed with ``SNOWDAY_SCORING_``.
+    Values can be overridden via a config mapping, a JSON config file, or
+    environment variables prefixed with ``SNOWDAY_SCORING_``.
     """
 
     base_score: float = 50.0
@@ -37,16 +38,21 @@ class ScoringConfig:
         *,
         config_path: Optional[str] = None,
         env: Mapping[str, str] | None = None,
+        config_data: Mapping[str, float] | None = None,
     ) -> "ScoringConfig":
         """Load configuration from defaults, file overrides, and environment.
 
         ``config_path`` should point to a JSON file where keys mirror the
         dataclass fields. Environment variables use uppercase names prefixed
         with ``SNOWDAY_SCORING_`` (e.g., ``SNOWDAY_SCORING_ICY_PENALTY``).
+        ``config_data`` allows callers to inject values loaded from YAML.
         """
 
         env = dict(env or os.environ)
         data: Dict[str, float] = {}
+
+        if config_data:
+            data.update({k: float(v) for k, v in config_data.items() if v is not None})
 
         if config_path:
             path = Path(config_path)
@@ -59,7 +65,10 @@ class ScoringConfig:
             if key.startswith(prefix):
                 field = key.removeprefix(prefix).lower()
                 if hasattr(cls, field):
-                    data[field] = float(value)
+                    try:
+                        data[field] = float(value)
+                    except ValueError:
+                        continue
 
         return cls(**data)
 
@@ -132,7 +141,7 @@ def score_snapshot(
     reading for powder/icy determination.
     """
 
-    config = config or ScoringConfig()
+    config = config or ScoringConfig.from_sources(config_data=app_config.scoring)
     previous_snapshot = None
     if previous_snapshots:
         previous_snapshot = list(previous_snapshots)[-1]

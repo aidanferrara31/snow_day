@@ -1,0 +1,54 @@
+resorts:
+  - id: alpine_peak
+    name: Alpine Peak
+    state: CO
+    scraper: alpine_peak
+  - id: summit_valley
+    name: Summit Valley
+    state: WA
+    scraper: summit_valley
+scrapers:
+  alpine_peak:
+    report_url: https://example.com/alpine-peak/snow-report
+    selectors:
+      snowfall: "section#snowfall .metric"
+      snowfall_period_attr: data-period
+      low_temp: "section#temperatures .low-temp"
+      high_temp: "section#temperatures .high-temp"
+      wind: "section#winds, section#wind"
+      base: "section#base"
+      lift_counts: "section#lifts .counts"
+      lift_open: ".open"
+      lift_total: ".total"
+      lifts: "section#lifts .lift-status li"
+      lift_name_attr: data-name
+      lift_status_attr: data-status
+  summit_valley:
+    report_url: https://example.com/summit-valley/conditions
+    selectors:
+      wind: ".conditions .wind"
+      base: ".conditions .base"
+      snowfall_12h: ".conditions .snowfall .h12"
+      snowfall_24h: ".conditions .snowfall .h24"
+      snowfall_7d: ".conditions .snowfall .d7"
+      temps_table: "table.temps tr"
+      lifts_table: "table.lifts tr"
+      lift_name_attr: data-name
+      lift_status_attr: data-status
+scheduler:
+  cron: "0 6,18 * * *"
+  enabled: true
+logging:
+  level: INFO
+  json: true
+scoring:
+  base_score: 50.0
+  max_score: 100.0
+  min_score: 0.0
+  base_depth_floor: 18.0
+  base_depth_weight: 0.5
+  gust_penalty_threshold: 25.0
+  gust_penalty_per_mph: 0.75
+  fresh_snow_bonus_per_inch: 2.0
+  powder_bonus: 12.0
+  icy_penalty: 15.0

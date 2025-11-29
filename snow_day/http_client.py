@@ -6,6 +6,9 @@ from typing import Dict, Optional
 import httpx
 
 from .cache import LastModifiedCache
+from .logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class HttpFetcher:
@@ -24,7 +27,9 @@ class HttpFetcher:
         self.backoff_factor = backoff_factor
         self.cache = cache or LastModifiedCache()
 
-    def fetch(self, url: str, *, extra_headers: Optional[Dict[str, str]] = None) -> httpx.Response:
+    def fetch(
+        self, url: str, *, extra_headers: Optional[Dict[str, str]] = None, trace_id: str | None = None
+    ) -> httpx.Response:
         headers: Dict[str, str] = {}
         headers.update(self.cache.get_conditional_headers(url))
         if extra_headers:
@@ -33,10 +38,18 @@ class HttpFetcher:
         last_error: Optional[Exception] = None
         for attempt in range(1, self.max_attempts + 1):
             try:
+                logger.info("http.fetch", trace_id=trace_id, url=url, attempt=attempt)
                 response = self.client.get(url, headers=headers)
                 return response
             except httpx.RequestError as exc:  # pragma: no cover - network failure path
                 last_error = exc
+                logger.warning(
+                    "http.fetch.retry",
+                    trace_id=trace_id,
+                    url=url,
+                    attempt=attempt,
+                    error=str(exc),
+                )
                 if attempt == self.max_attempts:
                     raise
                 sleep_for = self.backoff_factor * (2 ** (attempt - 1))
