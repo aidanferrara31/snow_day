@@ -32,17 +32,16 @@ def test_alpine_peak_parsing() -> None:
 
     snapshot = fetch_conditions(alpine_peak.RESORT_ID, client=client, cache=cache)
 
-    assert snapshot.snowfall.last_12h == 3
-    assert snapshot.snowfall.last_24h == 5
-    assert snapshot.snowfall.last_7d == 18
-    assert snapshot.temperature.current == 28
-    assert snapshot.wind_speed_mph == 12
-    assert snapshot.wind_direction == "NW"
-    assert snapshot.base_depth_in == 60
-    assert snapshot.lifts_open == 7
-    assert snapshot.lifts_total == 10
-    assert snapshot.lift_status["Summit Chair"] == "open"
-    assert snapshot.lift_status["Glades Quad"] == "hold"
+    assert snapshot.snowfall_12h == 3
+    assert snapshot.snowfall_24h == 5
+    assert snapshot.snowfall_7d == 18
+    assert snapshot.temp_min == 22
+    assert snapshot.temp_max == 32
+    assert snapshot.wind_speed == 12
+    assert snapshot.wind_chill is None
+    assert snapshot.base_depth == 60
+    assert snapshot.precip_type is None
+    assert snapshot.timestamp.tzinfo is not None
 
 
 def test_summit_valley_parsing() -> None:
@@ -54,19 +53,14 @@ def test_summit_valley_parsing() -> None:
     client = httpx.Client(transport=_make_mock_transport(handler))
     snapshot = fetch_conditions(summit_valley.RESORT_ID, client=client, cache=LastModifiedCache())
 
-    assert snapshot.snowfall.last_12h == 1
-    assert snapshot.snowfall.last_24h == 2
-    assert snapshot.snowfall.last_7d == 12
-    assert snapshot.temperature.current == 30
-    assert snapshot.temperature.high == 34
-    assert snapshot.temperature.low == 26
-    assert snapshot.wind_speed_mph == 8
-    assert snapshot.wind_direction == "NW"
-    assert snapshot.base_depth_in == 72
-    assert snapshot.lifts_open == 1
-    assert snapshot.lifts_total == 2
-    assert snapshot.lift_status["Gondola"] == "open"
-    assert snapshot.lift_status["Backside"] == "closed"
+    assert snapshot.snowfall_12h == 1
+    assert snapshot.snowfall_24h == 2
+    assert snapshot.snowfall_7d == 12
+    assert snapshot.temp_min == 26
+    assert snapshot.temp_max == 34
+    assert snapshot.wind_speed == 8
+    assert snapshot.wind_chill is None
+    assert snapshot.base_depth == 72
 
 
 def test_last_modified_caching_uses_snapshot() -> None:
