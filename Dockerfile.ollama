@@ -1,0 +1,22 @@
+# Minimal Ollama-based model server for local LLM evaluation.
+#
+# Build:
+#   docker build -f Dockerfile.ollama -t snow-day-ollama .
+# Run:
+#   docker run -d --name snow-day-ollama -p 11434:11434 snow-day-ollama
+#
+# Pull models (after the container is running):
+#   docker exec snow-day-ollama ollama pull phi3
+#   docker exec snow-day-ollama ollama pull llama3
+#   docker exec snow-day-ollama ollama pull gemma:2b
+#
+# The build intentionally avoids downloading models to keep the image small and
+# compatible with offline build environments. Use the commands above to pull
+# models once the container is running.
+
+FROM ollama/ollama:latest
+
+ENV OLLAMA_HOST=0.0.0.0
+EXPOSE 11434
+
+CMD ["ollama", "serve"]
