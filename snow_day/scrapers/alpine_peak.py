@@ -6,7 +6,8 @@ from typing import Dict
 
 from selectolax.parser import HTMLParser
 
-from ..models import ConditionSnapshot, Snowfall, Temperature
+from ..models import ConditionSnapshot
+from ..normalization import DEFAULT_NORMALIZER
 
 RESORT_ID = "alpine_peak"
 REPORT_URL = "https://example.com/alpine-peak/snow-report"
@@ -28,7 +29,6 @@ def parse_conditions(html: str) -> ConditionSnapshot:
         value = _extract_float(node.text())
         snowfall_values[period] = value
 
-    current_temp = _extract_float(tree.css_first("section#temperatures .current-temp").text())
     low_temp = _extract_float(tree.css_first("section#temperatures .low-temp").text())
     high_temp = _extract_float(tree.css_first("section#temperatures .high-temp").text())
 
@@ -63,23 +63,23 @@ def parse_conditions(html: str) -> ConditionSnapshot:
         status = node.attributes.get("data-status", node.text(strip=True))
         lift_status[name] = status.lower()
 
-    snowfall = Snowfall(
-        last_12h=snowfall_values.get("12h"),
-        last_24h=snowfall_values.get("24h"),
-        last_7d=snowfall_values.get("7d"),
-    )
-    temperature = Temperature(current=current_temp, low=low_temp, high=high_temp)
+    timestamp = datetime.now(timezone.utc)
+    raw_metrics = {
+        "wind_speed_mph": wind_speed,
+        "wind_chill_f": None,
+        "temp_low_f": low_temp,
+        "temp_high_f": high_temp,
+        "snowfall_last_12h_in": snowfall_values.get("12h"),
+        "snowfall_last_24h_in": snowfall_values.get("24h"),
+        "snowfall_last_7d_in": snowfall_values.get("7d"),
+        "base_depth_in": base_depth,
+        "precip_type": None,
+    }
 
-    return ConditionSnapshot(
-        resort_id=RESORT_ID,
-        fetched_at=datetime.now(timezone.utc),
-        snowfall=snowfall,
-        temperature=temperature,
-        wind_speed_mph=wind_speed,
-        wind_direction=wind_direction,
-        base_depth_in=base_depth,
-        lifts_open=lifts_open,
-        lifts_total=lifts_total,
-        lift_status=lift_status,
-        raw_source=REPORT_URL,
+    snapshot = DEFAULT_NORMALIZER.normalize(
+        RESORT_ID,
+        raw_metrics,
+        timestamp=timestamp,
     )
+
+    return snapshot

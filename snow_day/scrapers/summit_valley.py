@@ -6,7 +6,8 @@ from typing import Dict
 
 from selectolax.parser import HTMLParser
 
-from ..models import ConditionSnapshot, Snowfall, Temperature
+from ..models import ConditionSnapshot
+from ..normalization import DEFAULT_NORMALIZER
 
 RESORT_ID = "summit_valley"
 REPORT_URL = "https://example.com/summit-valley/conditions"
@@ -37,18 +38,18 @@ def parse_conditions(html: str) -> ConditionSnapshot:
     if base_node:
         base_depth = _extract_numeric(base_node.text())
 
-    snowfall = Snowfall(
-        last_12h=_extract_numeric(tree.css_first(".conditions .snowfall .h12").text()),
-        last_24h=_extract_numeric(tree.css_first(".conditions .snowfall .h24").text()),
-        last_7d=_extract_numeric(tree.css_first(".conditions .snowfall .d7").text()),
-    )
+    snowfall = {
+        "12h": _extract_numeric(tree.css_first(".conditions .snowfall .h12").text()),
+        "24h": _extract_numeric(tree.css_first(".conditions .snowfall .h24").text()),
+        "7d": _extract_numeric(tree.css_first(".conditions .snowfall .d7").text()),
+    }
 
-    temps = {row.css_first("th").text(strip=True).lower(): _extract_numeric(row.css_first("td").text()) for row in tree.css("table.temps tr")}
-    temperature = Temperature(
-        current=temps.get("current"),
-        low=temps.get("low"),
-        high=temps.get("high"),
-    )
+    temps = {
+        row.css_first("th").text(strip=True).lower(): _extract_numeric(
+            row.css_first("td").text()
+        )
+        for row in tree.css("table.temps tr")
+    }
 
     lift_status: Dict[str, str] = {}
     for row in tree.css("table.lifts tr"):
@@ -59,16 +60,19 @@ def parse_conditions(html: str) -> ConditionSnapshot:
     lifts_open = sum(1 for status in lift_status.values() if status == "open")
     lifts_total = len(lift_status)
 
-    return ConditionSnapshot(
-        resort_id=RESORT_ID,
-        fetched_at=datetime.now(timezone.utc),
-        snowfall=snowfall,
-        temperature=temperature,
-        wind_speed_mph=wind_speed,
-        wind_direction=wind_direction,
-        base_depth_in=base_depth,
-        lifts_open=lifts_open,
-        lifts_total=lifts_total,
-        lift_status=lift_status,
-        raw_source=REPORT_URL,
+    raw_metrics = {
+        "wind_speed_mph": wind_speed,
+        "wind_chill_f": None,
+        "temp_low_f": temps.get("low"),
+        "temp_high_f": temps.get("high"),
+        "snowfall_last_12h_in": snowfall["12h"],
+        "snowfall_last_24h_in": snowfall["24h"],
+        "snowfall_last_7d_in": snowfall["7d"],
+        "base_depth_in": base_depth,
+        "precip_type": None,
+    }
+
+    snapshot = DEFAULT_NORMALIZER.normalize(
+        RESORT_ID, raw_metrics, timestamp=datetime.now(timezone.utc)
     )
+    return snapshot
