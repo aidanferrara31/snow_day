@@ -18,6 +18,11 @@ def build_snapshot(resort_id: str, *, timestamp: datetime) -> ConditionSnapshot:
         snowfall_7d=5.0,
         base_depth=30.0,
         precip_type="snow",
+        is_operational=True,
+        lifts_open=5,
+        lifts_total=10,
+        trails_open=25,
+        trails_total=50,
     )
 
 

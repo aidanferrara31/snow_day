@@ -1,13 +1,18 @@
+"""Scraper for Alpine Peak (example/template scraper).
+
+This is a configurable scraper that uses CSS selectors defined in config.
+"""
 from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
-from typing import Dict, Mapping, MutableMapping
+from typing import Dict, Mapping, MutableMapping, Optional
 
-from selectolax.parser import HTMLParser
+from bs4 import BeautifulSoup
 
 from ..models import ConditionSnapshot
 from ..normalization import DEFAULT_NORMALIZER
+from .base import create_soup, extract_numeric
 
 RESORT_ID = "alpine_peak"
 DEFAULT_REPORT_URL = "https://example.com/alpine-peak/snow-report"
@@ -28,66 +33,72 @@ DEFAULT_SELECTORS: MutableMapping[str, str] = {
 }
 
 
-def _extract_float(text: str) -> float:
-    match = re.search(r"(-?\d+(?:\.\d+)?)", text)
-    if not match:
-        raise ValueError(f"No numeric value in '{text}'")
-    return float(match.group(1))
+def _extract_float(text: str) -> Optional[float]:
+    """Extract float from text, return None if not found."""
+    if not text:
+        return None
+    result = extract_numeric(text)
+    return result
 
 
 def parse_conditions(html: str, *, selectors: Mapping[str, str] | None = None) -> ConditionSnapshot:
+    """Parse snow report HTML using configurable selectors."""
     active_selectors: Dict[str, str] = {**DEFAULT_SELECTORS, **(selectors or {})}
-    tree = HTMLParser(html)
+    soup = create_soup(html)
 
     snowfall_values: Dict[str, float] = {}
-    for node in tree.css(active_selectors["snowfall"]):
-        period = node.attributes.get(active_selectors["snowfall_period_attr"])
-        value = _extract_float(node.text())
-        if period:
+    for node in soup.select(active_selectors["snowfall"]):
+        period = node.get(active_selectors["snowfall_period_attr"])
+        value = _extract_float(node.get_text())
+        if period and value is not None:
             snowfall_values[period] = value
 
-    low_temp = _extract_float(tree.css_first(active_selectors["low_temp"]).text())
-    high_temp = _extract_float(tree.css_first(active_selectors["high_temp"]).text())
+    low_temp = None
+    high_temp = None
+    low_temp_node = soup.select_one(active_selectors["low_temp"])
+    high_temp_node = soup.select_one(active_selectors["high_temp"])
+    if low_temp_node:
+        low_temp = _extract_float(low_temp_node.get_text())
+    if high_temp_node:
+        high_temp = _extract_float(high_temp_node.get_text())
 
-    wind_section = tree.css_first(active_selectors["wind"]) if active_selectors.get("wind") else None
     wind_speed = None
     wind_direction = None
-    if wind_section:
-        wind_text = wind_section.text()
-        wind_match = re.search(r"(?P<speed>\d+(?:\.\d+)?)\s*mph\s*(?P<direction>[A-Z]+)?", wind_text, re.IGNORECASE)
-        if wind_match:
-            wind_speed = float(wind_match.group("speed"))
-            wind_direction = wind_match.group("direction")
+    wind_selector = active_selectors.get("wind")
+    if wind_selector:
+        wind_section = soup.select_one(wind_selector)
+        if wind_section:
+            wind_text = wind_section.get_text()
+            wind_match = re.search(r"(?P<speed>\d+(?:\.\d+)?)\s*mph\s*(?P<direction>[A-Z]+)?", wind_text, re.IGNORECASE)
+            if wind_match:
+                wind_speed = float(wind_match.group("speed"))
+                wind_direction = wind_match.group("direction")
 
     base_depth = None
     base_selector = active_selectors.get("base")
     if base_selector:
-        base_node = tree.css_first(base_selector)
+        base_node = soup.select_one(base_selector)
         if base_node:
-            base_depth = _extract_float(base_node.text())
+            base_depth = _extract_float(base_node.get_text())
 
     lifts_open = None
     lifts_total = None
     counts_selector = active_selectors.get("lift_counts")
     if counts_selector:
-        counts = tree.css_first(counts_selector)
+        counts = soup.select_one(counts_selector)
         if counts:
             open_selector = active_selectors.get("lift_open")
             total_selector = active_selectors.get("lift_total")
             if open_selector and total_selector:
-                open_node = counts.css_first(open_selector)
-                total_node = counts.css_first(total_selector)
+                open_node = counts.select_one(open_selector)
+                total_node = counts.select_one(total_selector)
                 if open_node and total_node:
-                    lifts_open = int(_extract_float(open_node.text()))
-                    lifts_total = int(_extract_float(total_node.text()))
-
-    lift_status: Dict[str, str] = {}
-    lifts_selector = active_selectors.get("lifts")
-    if lifts_selector:
-        for node in tree.css(lifts_selector):
-            name = node.attributes.get(active_selectors.get("lift_name_attr", ""), node.text(strip=True))
-            status = node.attributes.get(active_selectors.get("lift_status_attr", ""), node.text(strip=True))
-            lift_status[name] = status.lower()
+                    open_val = _extract_float(open_node.get_text())
+                    total_val = _extract_float(total_node.get_text())
+                    if open_val is not None:
+                        lifts_open = int(open_val)
+                    if total_val is not None:
+                        lifts_total = int(total_val)
 
     timestamp = datetime.now(timezone.utc)
     raw_metrics = {

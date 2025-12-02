@@ -18,7 +18,7 @@ export default {
         card: '0 10px 35px rgba(0, 0, 0, 0.35)',
       },
       backgroundImage: {
-        'mountain-hero': "linear-gradient(to bottom, rgba(0,0,0,0.6), rgba(0,0,0,0.75)), url('https://images.unsplash.com/photo-1508261306217-011c10660dc6?auto=format&fit=crop&w=1600&q=80')",
+        'mountain-hero': "linear-gradient(to bottom, rgba(0,0,0,0.4), rgba(0,0,0,0.6)), url('/mountain-bg.jpg')",
       },
     },
   },

@@ -17,6 +17,7 @@ from snow_day.scheduler import build_scheduler
 from snow_day.scrapers import SCRAPERS, fetch_conditions
 from snow_day.services.llm_client import LLMClient, ScoredResort
 from snow_day.services.scoring import ScoreResult, ScoringConfig, score_snapshot
+from snow_day.services.weather import fetch_current_weather
 from snow_day.storage import ConditionStore
 
 setup_logging(app_config.logging)
@@ -47,6 +48,11 @@ class ConditionPayload(BaseModel):
     snowfall_7d: Optional[float] = None
     base_depth: Optional[float] = None
     precip_type: Optional[str] = None
+    is_operational: Optional[bool] = None
+    lifts_open: Optional[int] = None
+    lifts_total: Optional[int] = None
+    trails_open: Optional[int] = None
+    trails_total: Optional[int] = None
 
 
 class RankingPayload(BaseModel):
@@ -80,6 +86,74 @@ _resorts: List[ResortMeta] = all_resorts()
 _resort_index: Dict[str, ResortMeta] = resort_lookup(_resorts)
 
 
+def _augment_with_weather(snapshot: ConditionSnapshot, *, trace_id: Optional[str] = None) -> ConditionSnapshot:
+    resort = _resort_index.get(snapshot.resort_id)
+    if not resort or resort.latitude is None or resort.longitude is None:
+        return snapshot
+
+    needs_temp = snapshot.temp_max is None and snapshot.temp_min is None
+    needs_wind = snapshot.wind_speed is None
+    if not (needs_temp or needs_wind):
+        return snapshot
+
+    try:
+        observation = fetch_current_weather(resort.latitude, resort.longitude)
+    except Exception as exc:  # pragma: no cover - network fallback
+        logger.warning(
+            "weather.fallback_failed",
+            trace_id=trace_id,
+            resort_id=snapshot.resort_id,
+            error=str(exc),
+        )
+        return snapshot
+
+    if needs_temp and observation.temperature_f is not None:
+        snapshot.temp_max = observation.temperature_f
+        snapshot.temp_min = observation.temperature_f
+    if needs_wind and observation.wind_speed_mph is not None:
+        snapshot.wind_speed = observation.wind_speed_mph
+
+    logger.info(
+        "weather.fallback_applied",
+        trace_id=trace_id,
+        resort_id=snapshot.resort_id,
+    )
+    return snapshot
+
+
+def _infer_operational_status(snapshot: ConditionSnapshot) -> ConditionSnapshot:
+    """Infer operational status for ALL resorts, overriding incorrect False status.
+    
+    If a resort has open trails or lifts, it MUST be open, regardless of what
+    the scraper reported. This fixes cases where scrapers incorrectly mark
+    resorts as closed.
+    """
+    # Strongest signal: if trails or lifts are open, resort MUST be open
+    # This overrides any False status from scrapers
+    if (snapshot.trails_open or 0) > 0:
+        snapshot.is_operational = True
+        return snapshot
+    
+    if (snapshot.lifts_open or 0) > 0:
+        snapshot.is_operational = True
+        return snapshot
+    
+    # If already explicitly True, keep it
+    if snapshot.is_operational is True:
+        return snapshot
+    
+    # If status is unknown (None), try to infer from other signals
+    if snapshot.is_operational is None:
+        if (snapshot.base_depth or 0) >= 6:
+            snapshot.is_operational = True
+        elif (snapshot.snowfall_24h or snapshot.snowfall_12h or 0) > 0:
+            snapshot.is_operational = True
+    
+    # If status is False and we don't have trails/lifts data, leave it as False
+    # (resort might actually be closed)
+    return snapshot
+
+
 def _snapshot_to_payload(snapshot: ConditionSnapshot) -> ConditionPayload:
     resort = _resort_index.get(snapshot.resort_id)
     return ConditionPayload(
@@ -96,14 +170,22 @@ def _snapshot_to_payload(snapshot: ConditionSnapshot) -> ConditionPayload:
         snowfall_7d=snapshot.snowfall_7d,
         base_depth=snapshot.base_depth,
         precip_type=snapshot.precip_type,
+        is_operational=snapshot.is_operational,
+        lifts_open=snapshot.lifts_open,
+        lifts_total=snapshot.lifts_total,
+        trails_open=snapshot.trails_open,
+        trails_total=snapshot.trails_total,
     )
 
 
 def _latest_snapshots() -> List[ConditionSnapshot]:
+    """Get latest snapshots from storage and apply operational status inference."""
     snapshots: List[ConditionSnapshot] = []
     for resort_id in SCRAPERS.keys():
         latest = store.get_latest(resort_id)
         if latest:
+            # Apply operational status inference to fix incorrect closed status
+            latest = _infer_operational_status(latest)
             snapshots.append(latest)
     return snapshots
 
@@ -131,7 +213,24 @@ def _score_resorts() -> RankingsResponse:
                 conditions=payload,
             )
         )
-        scored_resorts.append(ScoredResort.from_result(payload.name, result))
+        scored_resorts.append(
+            ScoredResort.from_result(
+                payload.name,
+                result,
+                snowfall_24h=snapshot.snowfall_24h,
+                snowfall_12h=snapshot.snowfall_12h,
+                base_depth=snapshot.base_depth,
+                wind_speed=snapshot.wind_speed,
+                temp_min=snapshot.temp_min,
+                temp_max=snapshot.temp_max,
+                precip_type=snapshot.precip_type,
+                is_operational=snapshot.is_operational,
+                lifts_open=snapshot.lifts_open,
+                lifts_total=snapshot.lifts_total,
+                trails_open=snapshot.trails_open,
+                trails_total=snapshot.trails_total,
+            )
+        )
         if updated_at is None or snapshot.timestamp > updated_at:
             updated_at = snapshot.timestamp
 
@@ -146,6 +245,8 @@ def refresh_and_score() -> RankingsResponse:
         trace_id = uuid.uuid4().hex
         try:
             snapshot = fetch_conditions(resort_id, cache=cache, trace_id=trace_id)
+            snapshot = _augment_with_weather(snapshot, trace_id=trace_id)
+            snapshot = _infer_operational_status(snapshot)
             store.add_snapshot(snapshot)
         except Exception as exc:  # pragma: no cover - surface partial refresh when scrapes fail
             logger.error(

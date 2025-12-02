@@ -77,32 +77,50 @@ class ConditionNormalizer:
             snowfall_7d=resolve("snowfall_7d"),
             base_depth=resolve("base_depth"),
             precip_type=resolve("precip_type"),
+            lifts_open=resolve("lifts_open"),
+            lifts_total=resolve("lifts_total"),
+            trails_open=resolve("trails_open"),
+            trails_total=resolve("trails_total"),
+            is_operational=resolve("is_operational"),
         )
 
 
+# Standard field mapping for resorts using imperial units
+_STANDARD_MAPPING = {
+    "wind_speed": FieldMapping("wind_speed_mph"),
+    "wind_chill": FieldMapping("wind_chill_f"),
+    "temp_min": FieldMapping("temp_low_f"),
+    "temp_max": FieldMapping("temp_high_f"),
+    "snowfall_12h": FieldMapping("snowfall_last_12h_in"),
+    "snowfall_24h": FieldMapping("snowfall_last_24h_in"),
+    "snowfall_7d": FieldMapping("snowfall_last_7d_in"),
+    "base_depth": FieldMapping("base_depth_in"),
+    "precip_type": FieldMapping("precip_type"),
+    "lifts_open": FieldMapping("lifts_open"),
+    "lifts_total": FieldMapping("lifts_total"),
+    "trails_open": FieldMapping("trails_open"),
+    "trails_total": FieldMapping("trails_total"),
+    "is_operational": FieldMapping("is_operational"),
+}
+
 DEFAULT_NORMALIZER = ConditionNormalizer(
     mappings={
-        "alpine_peak": {
-            "wind_speed": FieldMapping("wind_speed_mph"),
-            "wind_chill": FieldMapping("wind_chill_f"),
-            "temp_min": FieldMapping("temp_low_f"),
-            "temp_max": FieldMapping("temp_high_f"),
-            "snowfall_12h": FieldMapping("snowfall_last_12h_in"),
-            "snowfall_24h": FieldMapping("snowfall_last_24h_in"),
-            "snowfall_7d": FieldMapping("snowfall_last_7d_in"),
-            "base_depth": FieldMapping("base_depth_in"),
-            "precip_type": FieldMapping("precip_type"),
-        },
-        "summit_valley": {
-            "wind_speed": FieldMapping("wind_speed_mph"),
-            "wind_chill": FieldMapping("wind_chill_f"),
-            "temp_min": FieldMapping("temp_low_f"),
-            "temp_max": FieldMapping("temp_high_f"),
-            "snowfall_12h": FieldMapping("snowfall_last_12h_in"),
-            "snowfall_24h": FieldMapping("snowfall_last_24h_in"),
-            "snowfall_7d": FieldMapping("snowfall_last_7d_in"),
-            "base_depth": FieldMapping("base_depth_in"),
-            "precip_type": FieldMapping("precip_type"),
-        },
+        "alpine_peak": _STANDARD_MAPPING,
+        "summit_valley": _STANDARD_MAPPING,
+        "cannon_mountain": _STANDARD_MAPPING,
+        "waterville_valley": _STANDARD_MAPPING,
+        "loon_mountain": _STANDARD_MAPPING,
+        "ragged_mountain": _STANDARD_MAPPING,
+        "pats_peak": _STANDARD_MAPPING,
+        "jay_peak": _STANDARD_MAPPING,
+        "bolton_valley": _STANDARD_MAPPING,
+        "killington": _STANDARD_MAPPING,
+        "pico": _STANDARD_MAPPING,
+        "sugarbush": _STANDARD_MAPPING,
+        "stratton": _STANDARD_MAPPING,
+        "okemo": _STANDARD_MAPPING,
+        "saddleback": _STANDARD_MAPPING,
+        "sugarloaf": _STANDARD_MAPPING,
+        "sunday_river": _STANDARD_MAPPING,
     }
 )

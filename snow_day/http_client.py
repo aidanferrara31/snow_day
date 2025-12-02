@@ -11,6 +11,9 @@ from .logging import get_logger
 logger = get_logger(__name__)
 
 
+DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; SnowDayBot/1.0; +https://github.com/snowday)"
+
+
 class HttpFetcher:
     """HTTP client wrapper with retry/backoff and Last-Modified caching."""
 
@@ -22,7 +25,10 @@ class HttpFetcher:
         backoff_factor: float = 0.5,
         cache: Optional[LastModifiedCache] = None,
     ) -> None:
-        self.client = client or httpx.Client(timeout=10.0)
+        self.client = client or httpx.Client(
+            timeout=10.0,
+            headers={"User-Agent": DEFAULT_USER_AGENT},
+        )
         self.max_attempts = max_attempts
         self.backoff_factor = backoff_factor
         self.cache = cache or LastModifiedCache()

@@ -1,13 +1,18 @@
+"""Scraper for Summit Valley (example/template scraper).
+
+This is a configurable scraper that uses CSS selectors defined in config.
+"""
 from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
-from typing import Dict, Mapping, MutableMapping
+from typing import Dict, Mapping, MutableMapping, Optional
 
-from selectolax.parser import HTMLParser
+from bs4 import BeautifulSoup
 
 from ..models import ConditionSnapshot
 from ..normalization import DEFAULT_NORMALIZER
+from .base import create_soup, extract_numeric
 
 RESORT_ID = "summit_valley"
 DEFAULT_REPORT_URL = "https://example.com/summit-valley/conditions"
@@ -25,24 +30,25 @@ DEFAULT_SELECTORS: MutableMapping[str, str] = {
 }
 
 
-def _extract_numeric(text: str) -> float:
-    match = re.search(r"(-?\d+(?:\.\d+)?)", text)
-    if not match:
-        raise ValueError(f"No numeric value in '{text}'")
-    return float(match.group(1))
+def _extract_float(text: str) -> Optional[float]:
+    """Extract float from text, return None if not found."""
+    if not text:
+        return None
+    return extract_numeric(text)
 
 
 def parse_conditions(html: str, *, selectors: Mapping[str, str] | None = None) -> ConditionSnapshot:
+    """Parse snow report HTML using configurable selectors."""
     active_selectors: Dict[str, str] = {**DEFAULT_SELECTORS, **(selectors or {})}
-    tree = HTMLParser(html)
+    soup = create_soup(html)
 
     wind_speed = None
     wind_direction = None
     wind_selector = active_selectors.get("wind")
     if wind_selector:
-        wind_node = tree.css_first(wind_selector)
+        wind_node = soup.select_one(wind_selector)
         if wind_node:
-            wind_text = wind_node.text()
+            wind_text = wind_node.get_text()
             match = re.search(r"(?P<direction>[A-Z]{1,3})\s+at\s+(?P<speed>\d+(?:\.\d+)?)", wind_text, re.IGNORECASE)
             if match:
                 wind_speed = float(match.group("speed"))
@@ -51,29 +57,44 @@ def parse_conditions(html: str, *, selectors: Mapping[str, str] | None = None) -
     base_depth = None
     base_selector = active_selectors.get("base")
     if base_selector:
-        base_node = tree.css_first(base_selector)
+        base_node = soup.select_one(base_selector)
         if base_node:
-            base_depth = _extract_numeric(base_node.text())
+            base_depth = _extract_float(base_node.get_text())
 
-    snowfall = {
-        "12h": _extract_numeric(tree.css_first(active_selectors["snowfall_12h"]).text()),
-        "24h": _extract_numeric(tree.css_first(active_selectors["snowfall_24h"]).text()),
-        "7d": _extract_numeric(tree.css_first(active_selectors["snowfall_7d"]).text()),
-    }
+    snowfall: Dict[str, Optional[float]] = {"12h": None, "24h": None, "7d": None}
+    
+    snowfall_12h_node = soup.select_one(active_selectors.get("snowfall_12h", ""))
+    snowfall_24h_node = soup.select_one(active_selectors.get("snowfall_24h", ""))
+    snowfall_7d_node = soup.select_one(active_selectors.get("snowfall_7d", ""))
+    
+    if snowfall_12h_node:
+        snowfall["12h"] = _extract_float(snowfall_12h_node.get_text())
+    if snowfall_24h_node:
+        snowfall["24h"] = _extract_float(snowfall_24h_node.get_text())
+    if snowfall_7d_node:
+        snowfall["7d"] = _extract_float(snowfall_7d_node.get_text())
 
-    temps = {
-        row.css_first("th").text(strip=True).lower(): _extract_numeric(row.css_first("td").text())
-        for row in tree.css(active_selectors["temps_table"])
-    }
+    temps: Dict[str, Optional[float]] = {"low": None, "high": None}
+    temps_selector = active_selectors.get("temps_table")
+    if temps_selector:
+        for row in soup.select(temps_selector):
+            th = row.select_one("th")
+            td = row.select_one("td")
+            if th and td:
+                key = th.get_text(strip=True).lower()
+                temps[key] = _extract_float(td.get_text())
 
     lift_status: Dict[str, str] = {}
-    for row in tree.css(active_selectors["lifts_table"]):
-        name = row.attributes.get(active_selectors.get("lift_name_attr", ""), row.text(strip=True))
-        status = row.attributes.get(active_selectors.get("lift_status_attr", ""), row.text(strip=True))
-        lift_status[name] = status.lower()
+    lifts_selector = active_selectors.get("lifts_table")
+    if lifts_selector:
+        for row in soup.select(lifts_selector):
+            name = row.get(active_selectors.get("lift_name_attr", ""), row.get_text(strip=True))
+            status = row.get(active_selectors.get("lift_status_attr", ""), row.get_text(strip=True))
+            if name:
+                lift_status[name] = status.lower() if status else ""
 
     lifts_open = sum(1 for status in lift_status.values() if status == "open")
-    lifts_total = len(lift_status)
+    lifts_total = len(lift_status) if lift_status else None
 
     raw_metrics = {
         "wind_speed_mph": wind_speed,

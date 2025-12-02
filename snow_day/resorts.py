@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, Optional
 
 from snow_day.config import app_config
 
@@ -14,6 +14,8 @@ class ResortMeta:
     name: str
     state: str
     report_url: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 def all_resorts() -> List[ResortMeta]:
@@ -30,6 +32,8 @@ def all_resorts() -> List[ResortMeta]:
                 name=resort.name,
                 state=resort.state,
                 report_url=report_url,
+                latitude=resort.latitude,
+                longitude=resort.longitude,
             )
         )
     return resorts

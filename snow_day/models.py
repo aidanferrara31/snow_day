@@ -25,6 +25,11 @@ class ConditionSnapshot:
     snowfall_7d: Optional[float] = None
     base_depth: Optional[float] = None
     precip_type: Optional[str] = None
+    is_operational: Optional[bool] = None
+    lifts_open: Optional[int] = None
+    lifts_total: Optional[int] = None
+    trails_open: Optional[int] = None
+    trails_total: Optional[int] = None
 
     @staticmethod
     def now(resort_id: str, **kwargs: object) -> "ConditionSnapshot":
@@ -47,6 +52,11 @@ class ConditionSnapshot:
             "snowfall_7d": self.snowfall_7d,
             "base_depth": self.base_depth,
             "precip_type": self.precip_type,
+            "is_operational": self.is_operational,
+            "lifts_open": self.lifts_open,
+            "lifts_total": self.lifts_total,
+            "trails_open": self.trails_open,
+            "trails_total": self.trails_total,
         }
 
     @classmethod
@@ -71,4 +81,9 @@ class ConditionSnapshot:
             snowfall_7d=data.get("snowfall_7d"),
             base_depth=data.get("base_depth"),
             precip_type=data.get("precip_type"),
+            is_operational=data.get("is_operational"),
+            lifts_open=data.get("lifts_open"),
+            lifts_total=data.get("lifts_total"),
+            trails_open=data.get("trails_open"),
+            trails_total=data.get("trails_total"),
         )

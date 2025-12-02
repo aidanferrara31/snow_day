@@ -35,7 +35,12 @@ class ConditionStore:
                     snowfall_24h REAL,
                     snowfall_7d REAL,
                     base_depth REAL,
-                    precip_type TEXT
+                    precip_type TEXT,
+                    is_operational INTEGER,
+                    lifts_open INTEGER,
+                    lifts_total INTEGER,
+                    trails_open INTEGER,
+                    trails_total INTEGER
                 )
                 """
             )
@@ -45,6 +50,11 @@ class ConditionStore:
                 ON snapshots(resort_id, timestamp)
                 """
             )
+            self._ensure_column(conn, "snapshots", "is_operational INTEGER")
+            self._ensure_column(conn, "snapshots", "lifts_open INTEGER")
+            self._ensure_column(conn, "snapshots", "lifts_total INTEGER")
+            self._ensure_column(conn, "snapshots", "trails_open INTEGER")
+            self._ensure_column(conn, "snapshots", "trails_total INTEGER")
 
     def add_snapshot(self, snapshot: ConditionSnapshot) -> None:
         data = snapshot.to_dict()
@@ -53,8 +63,9 @@ class ConditionStore:
                 """
                 INSERT INTO snapshots (
                     resort_id, timestamp, wind_speed, wind_chill, temp_min, temp_max,
-                    snowfall_12h, snowfall_24h, snowfall_7d, base_depth, precip_type
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    snowfall_12h, snowfall_24h, snowfall_7d, base_depth, precip_type,
+                    is_operational, lifts_open, lifts_total, trails_open, trails_total
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     data["resort_id"],
@@ -68,6 +79,11 @@ class ConditionStore:
                     data["snowfall_7d"],
                     data["base_depth"],
                     data.get("precip_type"),
+                    1 if data.get("is_operational") is True else 0 if data.get("is_operational") is False else None,
+                    data.get("lifts_open"),
+                    data.get("lifts_total"),
+                    data.get("trails_open"),
+                    data.get("trails_total"),
                 ),
             )
 
@@ -76,7 +92,8 @@ class ConditionStore:
             row = conn.execute(
                 """
                 SELECT resort_id, timestamp, wind_speed, wind_chill, temp_min, temp_max,
-                       snowfall_12h, snowfall_24h, snowfall_7d, base_depth, precip_type
+                       snowfall_12h, snowfall_24h, snowfall_7d, base_depth, precip_type,
+                       is_operational, lifts_open, lifts_total, trails_open, trails_total
                 FROM snapshots
                 WHERE resort_id = ?
                 ORDER BY timestamp DESC
@@ -93,7 +110,8 @@ class ConditionStore:
     ) -> List[ConditionSnapshot]:
         query = (
             "SELECT resort_id, timestamp, wind_speed, wind_chill, temp_min, temp_max,"
-            " snowfall_12h, snowfall_24h, snowfall_7d, base_depth, precip_type FROM snapshots"
+            " snowfall_12h, snowfall_24h, snowfall_7d, base_depth, precip_type,"
+            " is_operational, lifts_open, lifts_total, trails_open, trails_total FROM snapshots"
         )
         params: List[object] = []
         if resort_id:
@@ -188,6 +206,11 @@ class ConditionStore:
             snowfall_7d,
             base_depth,
             precip_type,
+            is_operational,
+            lifts_open,
+            lifts_total,
+            trails_open,
+            trails_total,
         ) = row
         return ConditionSnapshot.from_dict(
             {
@@ -202,5 +225,17 @@ class ConditionStore:
                 "snowfall_7d": snowfall_7d,
                 "base_depth": base_depth,
                 "precip_type": precip_type,
+                "is_operational": bool(is_operational) if is_operational is not None else None,
+                "lifts_open": lifts_open,
+                "lifts_total": lifts_total,
+                "trails_open": trails_open,
+                "trails_total": trails_total,
             }
         )
+
+    @staticmethod
+    def _ensure_column(conn: sqlite3.Connection, table: str, column_def: str) -> None:
+        column_name = column_def.split()[0]
+        existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        if column_name not in existing:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column_def}")

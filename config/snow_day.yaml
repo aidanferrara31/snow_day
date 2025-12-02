@@ -1,40 +1,161 @@
 resorts:
+  # New Hampshire
+  - id: cannon_mountain
+    name: Cannon Mountain
+    state: NH
+    scraper: cannon_mountain
+    latitude: 44.156
+    longitude: -71.695
+  - id: waterville_valley
+    name: Waterville Valley Resort
+    state: NH
+    scraper: waterville_valley
+    latitude: 43.95
+    longitude: -71.512
+  - id: ragged_mountain
+    name: Ragged Mountain
+    state: NH
+    scraper: ragged_mountain
+    latitude: 43.484
+    longitude: -71.851
+  - id: pats_peak
+    name: Pat's Peak Mountain
+    state: NH
+    scraper: pats_peak
+    latitude: 43.147
+    longitude: -71.808
+  - id: loon_mountain
+    name: Loon Mountain
+    state: NH
+    scraper: loon_mountain
+    latitude: 44.037
+    longitude: -71.621
   - id: alpine_peak
     name: Alpine Peak
-    state: CO
+    state: NH
     scraper: alpine_peak
+    latitude: 44.05
+    longitude: -71.45
+  # Vermont
+  - id: okemo
+    name: Okemo Mountain Resort
+    state: VT
+    scraper: okemo
+    latitude: 43.401
+    longitude: -72.717
+  - id: jay_peak
+    name: Jay Peak Resort
+    state: VT
+    scraper: jay_peak
+    latitude: 44.937
+    longitude: -72.504
+  - id: bolton_valley
+    name: Bolton Valley
+    state: VT
+    scraper: bolton_valley
+    latitude: 44.422
+    longitude: -72.846
+  - id: killington
+    name: Killington
+    state: VT
+    scraper: killington
+    latitude: 43.605
+    longitude: -72.82
+  - id: pico
+    name: Pico Mountain
+    state: VT
+    scraper: pico
+    latitude: 43.664
+    longitude: -72.844
+  - id: sugarbush
+    name: Sugarbush Resort
+    state: VT
+    scraper: sugarbush
+    latitude: 44.145
+    longitude: -72.894
+  - id: stratton
+    name: Stratton Mountain Resort
+    state: VT
+    scraper: stratton
+    latitude: 43.114
+    longitude: -72.908
   - id: summit_valley
     name: Summit Valley
-    state: WA
+    state: VT
     scraper: summit_valley
+    latitude: 44.2
+    longitude: -72.75
+  # Maine
+  - id: saddleback
+    name: Saddleback Mountain
+    state: ME
+    scraper: saddleback
+    latitude: 44.948
+    longitude: -70.514
+  - id: sugarloaf
+    name: Sugarloaf
+    state: ME
+    scraper: sugarloaf
+    latitude: 45.031
+    longitude: -70.313
+  - id: sunday_river
+    name: Sunday River
+    state: ME
+    scraper: sunday_river
+    latitude: 44.473
+    longitude: -70.856
 scrapers:
+  cannon_mountain:
+    report_url: https://www.cannonmt.com/mountain-report
+    selectors: {}
+  okemo:
+    report_url: https://www.onthesnow.com/vermont/okemo-mountain-resort/skireport
+    selectors: {}
+  waterville_valley:
+    report_url: https://www.waterville.com/snow-report-maps
+    selectors: {}
+  ragged_mountain:
+    report_url: https://www.raggedmountainresort.com/mountain-report-cams/
+    selectors: {}
+  pats_peak:
+    report_url: https://www.patspeak.com/the-mountain/mountain-info/snow-report/
+    selectors: {}
+  loon_mountain:
+    report_url: https://www.loonmtn.com/mountain-report
+    selectors: {}
   alpine_peak:
     report_url: https://example.com/alpine-peak/snow-report
-    selectors:
-      snowfall: "section#snowfall .metric"
-      snowfall_period_attr: data-period
-      low_temp: "section#temperatures .low-temp"
-      high_temp: "section#temperatures .high-temp"
-      wind: "section#winds, section#wind"
-      base: "section#base"
-      lift_counts: "section#lifts .counts"
-      lift_open: ".open"
-      lift_total: ".total"
-      lifts: "section#lifts .lift-status li"
-      lift_name_attr: data-name
-      lift_status_attr: data-status
+    selectors: {}
+  jay_peak:
+    report_url: https://jaypeakresort.com/skiing-riding/snow-report-maps/snow-report
+    selectors: {}
+  bolton_valley:
+    report_url: https://www.boltonvalley.com/winter/trail-maps-snow-reports/snow-reports/
+    selectors: {}
+  killington:
+    report_url: https://www.killington.com/the-mountain/conditions-weather/current-conditions-weather/
+    selectors: {}
+  pico:
+    report_url: https://www.picomountain.com/the-mountain/conditions-weather/current-conditions-weather/
+    selectors: {}
+  sugarbush:
+    report_url: https://www.sugarbush.com/mountain/conditions
+    selectors: {}
+  stratton:
+    report_url: https://www.stratton.com/the-mountain/mountain-report
+    selectors: {}
   summit_valley:
     report_url: https://example.com/summit-valley/conditions
-    selectors:
-      wind: ".conditions .wind"
-      base: ".conditions .base"
-      snowfall_12h: ".conditions .snowfall .h12"
-      snowfall_24h: ".conditions .snowfall .h24"
-      snowfall_7d: ".conditions .snowfall .d7"
-      temps_table: "table.temps tr"
-      lifts_table: "table.lifts tr"
-      lift_name_attr: data-name
-      lift_status_attr: data-status
+    selectors: {}
+  saddleback:
+    report_url: https://www.saddlebackmaine.com/mountain-report/
+    selectors: {}
+  sugarloaf:
+    report_url: https://www.sugarloaf.com/mountain-report
+    selectors: {}
+  sunday_river:
+    report_url: https://www.sundayriver.com/mountain-report
+    selectors: {}
 scheduler:
   cron: "0 6,18 * * *"
   enabled: true
@@ -47,8 +168,18 @@ scoring:
   min_score: 0.0
   base_depth_floor: 18.0
   base_depth_weight: 0.5
-  gust_penalty_threshold: 25.0
-  gust_penalty_per_mph: 0.75
+  base_depth_bonus_per_inch: 0.3
+  wind_ideal: 0.0
+  wind_penalty_per_mph: 0.5
+  temp_ideal_min: 32.0
+  temp_ideal_max: 38.0
+  temp_penalty_per_degree: 0.4
+  trails_open_bonus_per_percent: 0.2
+  lifts_open_bonus_per_percent: 0.15
   fresh_snow_bonus_per_inch: 2.0
   powder_bonus: 12.0
   icy_penalty: 15.0
+  closed_resort_penalty: 1000.0
+  unknown_status_penalty: 10.0
+  missing_metric_penalty: 5.0
+  low_base_penalty_per_inch: 0.75

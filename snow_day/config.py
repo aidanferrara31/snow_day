@@ -63,6 +63,8 @@ class ResortSettings:
     name: str
     state: str
     scraper: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 @dataclass
