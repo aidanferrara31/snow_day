@@ -153,7 +153,7 @@ class LLMClient:
     ) -> None:
         resolved_base_url = base_url or os.getenv("SNOWDAY_LLM_URL", "http://localhost:11434")
         self.base_url = resolved_base_url.rstrip("/")
-        self.model = model
+        self.model = os.getenv("SNOWDAY_LLM_MODEL", model)
         self.client = client or httpx.Client(timeout=timeout)
         self.fallback = fallback or RuleBasedAdvisor()
         

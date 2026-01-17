@@ -8,6 +8,7 @@ services:
       - "8000:8000"
     environment:
       - SNOWDAY_LLM_URL=http://model:11434
+      - SNOWDAY_LLM_MODEL=qwen2.5:3b-instruct
     volumes:
       - .:/app
       - snow_day_data:/app/data
@@ -30,12 +31,14 @@ services:
 
   model:
     build:
-      context: .
-      dockerfile: Dockerfile.ollama
+      context: ./infra/ollama
     ports:
       - "11434:11434"
     volumes:
       - ollama_models:/root/.ollama
+    environment:
+      # Optional: pre-pull one or more models on startup (comma-separated).
+      - OLLAMA_PULL_MODELS=qwen2.5:3b-instruct
 
 volumes:
   snow_day_data:

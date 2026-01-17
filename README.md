@@ -58,6 +58,14 @@ Use the provided Dockerfile to run an Ollama-compatible model server locally.
 This keeps model evaluation self-contained while allowing you to choose the
 model family that fits your hardware (e.g., `phi3`, `llama3`, or `gemma`).
 
+The Docker Compose stack uses a dedicated Ollama service definition in
+`infra/ollama/` (pinned to Ollama 0.13.5). See `infra/ollama/README.md` for
+options like pre-pulling models at container startup.
+
+This repo’s default Compose configuration uses **`qwen2.5:3b-instruct`** via:
+- `SNOWDAY_LLM_MODEL=qwen2.5:3b-instruct` (backend)
+- `OLLAMA_PULL_MODELS=qwen2.5:3b-instruct` (model container warmup)
+
 1. Build the image:
    ```bash
    docker build -f Dockerfile.ollama -t snow-day-ollama .

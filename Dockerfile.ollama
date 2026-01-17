@@ -14,9 +14,9 @@
 # compatible with offline build environments. Use the commands above to pull
 # models once the container is running.
 
-FROM ollama/ollama:latest
+FROM ollama/ollama:0.13.5
 
-ENV OLLAMA_HOST=0.0.0.0
+ENV OLLAMA_HOST=0.0.0.0:11434
 EXPOSE 11434
 
 CMD ["serve"]
